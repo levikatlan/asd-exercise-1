@@ -3,6 +3,8 @@ import struct
 import time
 from datetime import datetime as dt
 
+_READ_BUFFER = 4096
+
 
 def run_server(address: tuple) -> None:
     _HEADER_FORMAT = '<QQI'
@@ -17,13 +19,23 @@ def run_server(address: tuple) -> None:
 
             while True:
                 client, client_address = server.accept()
-                user_id, timestamp, thought_size = struct.unpack(_HEADER_FORMAT, client.recv(_HEADER_SIZE))
-                thought = struct.unpack(f'{thought_size}s', client.recv(thought_size))[0]
+                data = read_data(client)
+                user_id, timestamp, thought_size = struct.unpack(_HEADER_FORMAT, data[:_HEADER_SIZE])
+                thought = struct.unpack(f'{thought_size}s', data[_HEADER_SIZE:])[0]
                 time.sleep(_HANDLING_DELAY_SECONDS)
                 print(f'[{dt.fromtimestamp(timestamp).strftime("%F %H:%M:%S")}] user {user_id}: {thought.decode()}')
     except Exception as e:
         print(f'Error in "run_server": {e}')
         raise e
+
+
+def read_data(connection: socket.socket, buffer_size: int = _READ_BUFFER) -> bytes:
+    data = b''
+    while new_data := connection.recv(buffer_size):
+        if not new_data:
+            break
+        data += new_data
+    return data
 
 
 def main(argv):
